@@ -13,7 +13,9 @@
 !include/
 !include/**
 !ebpf/
-!ebpf/**
 !config/
 !config/**
 !logs/.gitkeep
+
+!ebpf/probes.bpf.c
+!ebpf/probes.bpf.h
