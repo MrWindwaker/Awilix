@@ -19,3 +19,7 @@
 
 !ebpf/probes.bpf.c
 !ebpf/probes.bpf.h
+
+!mrwindwaker_public.pem
+!vanitycard.sig
+!VanityCard.txt
