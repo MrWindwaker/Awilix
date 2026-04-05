@@ -6,11 +6,12 @@
 #include <fstream>
 #include <unordered_set>
 #include <vector>
-
+#include <sstream>
 #include <bpf/libbpf.h>
 #include "ebpf/probes.skel.h"
 #include "ebpf/probes.bpf.h"
 #include <arpa/inet.h>
+#include <unistd.h>
 
 struct probes_bpf *loadBpf()
 {
@@ -37,6 +38,34 @@ struct probes_bpf *loadBpf()
 
     std::cerr << "[AWILIX] eBPF probe attached" << std::endl;
     return skel;
+}
+
+std::string getParentPid(const std::string &pid)
+{
+    std::ifstream file("/proc/" + pid + "/stat");
+    if (file)
+    {
+        std::stringstream buf;
+        buf << file.rdbuf();
+        std::string content = buf.str();
+
+        if (!content.empty())
+        {
+            size_t closingPnt = content.find(')');
+            if (closingPnt == std::string::npos)
+                return "";
+
+            std::istringstream iss(content.substr(closingPnt + 1));
+            std::string state, ppid;
+            iss >> state >> ppid;
+
+            return ppid;
+        }
+
+        return "";
+    }
+
+    return "";
 }
 
 void cleanPids(std::unordered_set<std::string> &pids)
@@ -95,6 +124,17 @@ void scanProc(std::unordered_set<std::string> &pids, struct probes_bpf *skel)
 
             std::string content = readCmdline(pid);
 
+            std::string ppid = getParentPid(pid);
+            if (!ppid.empty() && pids.find(ppid) != pids.end())
+            {
+                __u32 pid_num = std::stoul(pid);
+                __u8 val = 1;
+
+                bpf_map__update_elem(skel->maps.watched_pids, &pid_num, sizeof(pid_num), &val, sizeof(val), BPF_ANY);
+                pids.insert(pid);
+                std::cout << "[CHILD] PID " << pid << " (parent: " << ppid << ")" << std::endl;
+            }
+
             if (!content.empty() && content.find("npm install") != std::string::npos)
             {
 
@@ -109,6 +149,19 @@ void scanProc(std::unordered_set<std::string> &pids, struct probes_bpf *skel)
     }
 }
 
+bool isAllowed(__u32 ip)
+{
+    unsigned char *ip_bytes = (unsigned char *)&ip;
+
+    if (ip_bytes[0] == 104 && ip_bytes[1] == 16)
+        return true;
+
+    if (ip_bytes[0] == 100 && ip_bytes[1] == 100 && ip_bytes[2] == 100 && ip_bytes[3] == 100)
+        return true;
+
+    return false;
+}
+
 int handleEvent(void *ctx, void *data, size_t size)
 {
     struct event *e = (struct event *)data;
@@ -116,15 +169,12 @@ int handleEvent(void *ctx, void *data, size_t size)
     __u32 ip = e->ip;
     unsigned char *ip_bytes = (unsigned char *)&ip;
 
-    std::cout << "[CONNECTION] PID " << e->pid
-              << " (" << e->comm << ")"
-              << " -> "
-              << (int)ip_bytes[0] << "."
-              << (int)ip_bytes[1] << "."
-              << (int)ip_bytes[2] << "."
-              << (int)ip_bytes[3]
-              << ":" << ntohs(e->port)
-              << std::endl;
+    std::string destination = std::to_string(ip_bytes[0]) + "." + std::to_string(ip_bytes[1]) + "." + std::to_string(ip_bytes[2]) + "." + std::to_string(ip_bytes[3]) + ":" + std::to_string(ntohs(e->port));
+
+    if (isAllowed(e->ip))
+        std::cout << "[ALLOWED] PID " << e->ip << " (" << e->comm << ") -> " << destination << std::endl;
+    else
+        std::cout << "[BLOCKED]" << e->ip << " (" << e->comm << ") -> " << destination << std::endl;
 
     return 0;
 }
@@ -146,6 +196,8 @@ int main()
         ring_buffer__poll(rb, 100);
         cleanPids(pids);
         scanProc(pids, skel);
+
+        usleep(1000);
     }
 
     return 0;
