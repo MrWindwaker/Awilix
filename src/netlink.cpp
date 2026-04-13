@@ -1,4 +1,4 @@
-#include "netlink.h"
+#include "include/netlink.h"
 
 int initNetlink() {
     int sock = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_CONNECTOR);

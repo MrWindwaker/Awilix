@@ -1,6 +1,9 @@
 #ifndef __PROBES_BPF_H
 #define __PROBES_BPF_H
 
+#ifndef __BPF_COMPILATION__
+#include <linux/types.h>
+#endif
 
 struct event
 {

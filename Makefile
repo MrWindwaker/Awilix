@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall
 
-SRC = src/awilix.cpp src/monitor.cpp src/netlink.cpp src/allowlist.cpp src/events.cpp
+SRC = src/awilix.cpp src/monitor.cpp src/netlink.cpp src/allowlist.cpp src/events.cpp src/logger.cpp
 TARGET = bin/awilix
 BPF_SRC = ebpf/probes.bpf.c
 BPF_OBJ = ebpf/probes.bpf.o
@@ -15,7 +15,7 @@ $(BPF_SKEL) : $(BPF_OBJ)
 	bpftool gen skeleton $(BPF_OBJ) > $(BPF_SKEL)
 
 $(BPF_OBJ) : $(BPF_SRC)
-	clang -g -O2 -target bpf -D__TARGET_ARCH_x86 \
+	clang -g -O2 -target bpf -D__TARGET_ARCH_x86 -D__BPF_COMPILATION__\
 	-I /usr/include/bpf \
 	-I ebpf/ \
 	-c $(BPF_SRC) -o $(BPF_OBJ)

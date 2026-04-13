@@ -2,10 +2,11 @@
 #include <mutex>
 #include <thread>
 
-#include "monitor.h"
-#include "events.h"
-#include "allowlist.h"
-#include "netlink.h"
+#include "include/monitor.h"
+#include "include/events.h"
+#include "include/allowlist.h"
+#include "include/netlink.h"
+#include "include/logger.h"
 
 struct probes_bpf *loadBpf()
 {
@@ -37,6 +38,7 @@ struct probes_bpf *loadBpf()
 int main()
 {
     std::unordered_set<std::string> pids = {};
+    initLogger();
     probes_bpf *skel = loadBpf();
 
     populateAllowlist(skel);

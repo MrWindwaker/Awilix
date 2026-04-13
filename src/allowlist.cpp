@@ -1,4 +1,4 @@
-#include "allowlist.h"
+#include "include/allowlist.h"
 
 bool isAllowed(__u32 ip)
 {

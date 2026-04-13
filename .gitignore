@@ -13,9 +13,8 @@
 !include/
 !include/**
 !ebpf/
-!config/
-!config/**
 !logs/.gitkeep
+logs/awilix.log
 
 !ebpf/probes.bpf.c
 !ebpf/probes.bpf.h

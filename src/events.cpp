@@ -1,4 +1,5 @@
-#include "events.h"
+#include "include/events.h"
+#include "include/logger.h"
 
 int handleEvent(void *ctx, void *data, size_t size)
 {
@@ -12,7 +13,11 @@ int handleEvent(void *ctx, void *data, size_t size)
     if (isAllowed(e->ip))
         std::cout << "[ALLOWED] PID " << e->pid << " (" << e->comm << ") -> " << destination << std::endl;
     else
+    {
         std::cout << "[BLOCKED]" << e->pid << " (" << e->comm << ") -> " << destination << std::endl;
+        createLog(e);
+        alertUser(e);
+    }
 
     return 0;
 }
