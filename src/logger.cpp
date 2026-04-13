@@ -15,19 +15,24 @@ void alertUser(struct event *e)
     if (!e->blocked)
         return;
 
-    __u32 ip = e->ip;
-    unsigned char *b = (unsigned char *)&ip;
+    std::string tty = "/proc/" + std::to_string(e->ppid) + "/fd/1";
+    std::ofstream userTerm(tty);
 
-    std::string ip_str = std::to_string(b[0]) + "." +
-                         std::to_string(b[1]) + "." +
-                         std::to_string(b[2]) + "." +
-                         std::to_string(b[3]);
+    if (userTerm)
+    {
+        __u32 ip = e->ip;
+        unsigned char *b = (unsigned char *)&ip;
 
-    std::cout << "\n[AWILIX] ⚠ Suspicious connection blocked!" << std::endl;
-    std::cout << "[AWILIX] Process: " << e->comm << " (PID " << e->pid << ")" << std::endl;
-    std::cout << "[AWILIX] Attempted to connect to: " << ip_str << ":" << ntohs(e->port) << std::endl;
-    std::cout << "[AWILIX] This has been logged to logs/awilix.log\n"
-              << std::endl;
+        std::string ip_str = std::to_string(b[0]) + "." +
+                             std::to_string(b[1]) + "." +
+                             std::to_string(b[2]) + "." +
+                             std::to_string(b[3]);
+
+        userTerm << "\n[AWILIX] ⚠ Suspicious connection blocked!\n";
+        userTerm << "[AWILIX] Process: " << e->comm << " (PID " << e->pid << ")\n";
+        userTerm << "[AWILIX] Attempted to connect to: " << ip_str << ":" << ntohs(e->port);
+        userTerm << "\n[AWILIX] This has been logged to logs/awilix.log\n";
+    }
 }
 
 void createLog(struct event *e)

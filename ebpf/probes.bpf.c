@@ -68,6 +68,11 @@ int BPF_PROG(handle_connect, struct socket *sock, struct sockaddr *address, int 
     e->timestamp = bpf_ktime_get_ns();
     bpf_get_current_comm(e->comm, sizeof(e->comm));
 
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task_btf();
+    __u32 ppid;
+    bpf_probe_read_kernel(&ppid, sizeof(ppid), &task->real_parent->tgid);
+    e->ppid = ppid;
+
     __u8 *allowed = bpf_map_lookup_elem(&allowed_ips, &ip);
     if (!allowed)
     {
