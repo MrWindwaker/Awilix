@@ -38,6 +38,9 @@ int main()
 {
     std::unordered_set<std::string> pids = {};
     probes_bpf *skel = loadBpf();
+
+    populateAllowlist(skel);
+
     int sock = initNetlink();
     int subs = subscribeNetlink(sock);
 

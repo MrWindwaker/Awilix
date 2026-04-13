@@ -8,6 +8,10 @@ char LICENSE[] SEC("license") = "GPL";
 #define AF_INET 2
 #endif
 
+#ifndef EPERM
+#define EPERM 1
+#endif
+
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 1 << 24);
@@ -20,8 +24,16 @@ struct {
     __type(value, __u8);
 } watched_pids SEC(".maps");
 
-SEC("tracepoint/syscalls/sys_enter_connect") 
-int handle_connect(struct trace_event_raw_sys_enter *ctx)
+struct
+{
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 256);
+    __type(key, __u32);
+    __type(value, __u8);
+} allowed_ips SEC(".maps");
+
+SEC("tracepoint/syscalls/sys_enter_connect")
+int handle_connect_tp(struct trace_event_raw_sys_enter *ctx)
 {
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     __u32 pid = pid_tgid >> 32;
@@ -58,6 +70,41 @@ int handle_connect(struct trace_event_raw_sys_enter *ctx)
     bpf_get_current_comm(e->comm, sizeof(e->comm));
 
     bpf_ringbuf_submit(e, 0);
+
+    return 0;
+}
+
+SEC("lsm/socket_connect")
+int BPF_PROG(handle_connect, struct socket *sock, struct sockaddr *address, int addrlen)
+{
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = pid_tgid >> 32;
+
+    __u8 *watched = bpf_map_lookup_elem(&watched_pids, &pid);
+    if (!watched)
+    {
+        return 0;
+    }
+
+    __u16 family;
+    bpf_probe_read_kernel(&family, sizeof(family), &address->sa_family);
+
+    if (family != AF_INET)
+    {
+        return 0;
+    }
+
+    struct sockaddr_in *addr_in = (struct sockaddr_in *)address;
+    __u32 ip;
+    __u16 port;
+    bpf_probe_read_kernel(&ip, sizeof(ip), &addr_in->sin_addr);
+    bpf_probe_read_kernel(&port, sizeof(port), &addr_in->sin_port);
+
+    __u8 *allowed = bpf_map_lookup_elem(&allowed_ips, &ip);
+    if (!allowed)
+    {
+        return -EPERM;
+    }
 
     return 0;
 }

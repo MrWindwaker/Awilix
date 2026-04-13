@@ -12,3 +12,17 @@ bool isAllowed(__u32 ip)
 
     return false;
 }
+
+void populateAllowlist(struct probes_bpf *skel)
+{
+    __u8 val = 1;
+
+    for (int i = 0; i <= 255; i++)
+    {
+        __u32 ip = (104) | (16 << 8) | (i << 16) | (34 << 24);
+        bpf_map__update_elem(skel->maps.allowed_ips, &ip, sizeof(ip), &val, sizeof(val), BPF_ANY);
+    }
+
+    __u32 dns = (100) | (100 << 8) | (100 << 16) | (100 < 24);
+    bpf_map__update_elem(skel->maps.allowed_ips, &dns, sizeof(dns), &val, sizeof(val), BPF_ANY);
+}
