@@ -9,7 +9,7 @@ struct event
     __u16 port;
     __u64 timestamp;
     char comm[16];
+    __u8 blocked;
 };
-
 
 #endif

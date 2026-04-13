@@ -32,48 +32,6 @@ struct
     __type(value, __u8);
 } allowed_ips SEC(".maps");
 
-SEC("tracepoint/syscalls/sys_enter_connect")
-int handle_connect_tp(struct trace_event_raw_sys_enter *ctx)
-{
-    __u64 pid_tgid = bpf_get_current_pid_tgid();
-    __u32 pid = pid_tgid >> 32;
-
-    __u8 *watched = bpf_map_lookup_elem(&watched_pids, &pid);
-    if (!watched)
-        return 0;
-    
-
-    struct sockaddr *addr = (struct sockaddr *)ctx->args[1];
-
-    __u16 family;
-    bpf_probe_read_user(&family, sizeof(family), &addr->sa_family);
-
-    if (family != AF_INET)
-        return 0;
-
-    struct sockaddr_in *addr_in = (struct sockaddr_in *)addr;
-
-    __u32 ip;
-    __u16 port;
-
-    bpf_probe_read_user(&ip, sizeof(ip), &addr_in->sin_addr);
-    bpf_probe_read_user(&port, sizeof(port), &addr_in->sin_port);
-
-    struct event *e = bpf_ringbuf_reserve(&events, sizeof(struct event), 0);
-    if (!e)
-        return 0;
-
-    e->pid = pid;
-    e->ip = ip;
-    e->port = port;
-    e->timestamp = bpf_ktime_get_ns();
-    bpf_get_current_comm(e->comm, sizeof(e->comm));
-
-    bpf_ringbuf_submit(e, 0);
-
-    return 0;
-}
-
 SEC("lsm/socket_connect")
 int BPF_PROG(handle_connect, struct socket *sock, struct sockaddr *address, int addrlen)
 {
@@ -100,11 +58,25 @@ int BPF_PROG(handle_connect, struct socket *sock, struct sockaddr *address, int 
     bpf_probe_read_kernel(&ip, sizeof(ip), &addr_in->sin_addr);
     bpf_probe_read_kernel(&port, sizeof(port), &addr_in->sin_port);
 
+    struct event *e = bpf_ringbuf_reserve(&events, sizeof(struct event), 0);
+    if (!e)
+        return -EPERM;
+
+    e->pid = pid;
+    e->ip = ip;
+    e->port = port;
+    e->timestamp = bpf_ktime_get_ns();
+    bpf_get_current_comm(e->comm, sizeof(e->comm));
+
     __u8 *allowed = bpf_map_lookup_elem(&allowed_ips, &ip);
     if (!allowed)
     {
+        e->blocked = 1;
+        bpf_ringbuf_submit(e, 0);
         return -EPERM;
     }
 
+    e->blocked = 0;
+    bpf_ringbuf_submit(e, 0);
     return 0;
 }
