@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall
 
-SRC = src/awilix.cpp
+SRC = src/awilix.cpp src/monitor.cpp src/netlink.cpp src/allowlist.cpp src/events.cpp
 TARGET = bin/awilix
 BPF_SRC = ebpf/probes.bpf.c
 BPF_OBJ = ebpf/probes.bpf.o
